@@ -1,0 +1,126 @@
+{
+  "questions": [
+    {
+      "id": "q_oxygen_saturation",
+      "question": "What is the patient's current oxygen saturation (SpO2 %)?",
+      "field": "oxygen_saturation",
+      "category": "vitals",
+      "type": "float",
+      "min": 50.0,
+      "max": 100.0,
+      "risk_impact": 3.0,
+      "uncertainty_reduction": 3.0,
+      "applicable_to": ["general", "respiratory", "cardiovascular", "shortness_of_breath"]
+    },
+    {
+      "id": "q_heart_rate",
+      "question": "What is the patient's heart rate (beats per minute)?",
+      "field": "heart_rate",
+      "category": "vitals",
+      "type": "int",
+      "min": 20,
+      "max": 300,
+      "risk_impact": 3.0,
+      "uncertainty_reduction": 3.0,
+      "applicable_to": ["general", "cardiovascular", "palpitations", "chest_pain"]
+    },
+    {
+      "id": "q_respiratory_rate",
+      "question": "What is the patient's respiratory rate (breaths per minute)?",
+      "field": "respiratory_rate",
+      "category": "vitals",
+      "type": "int",
+      "min": 5,
+      "max": 70,
+      "risk_impact": 3.0,
+      "uncertainty_reduction": 3.0,
+      "applicable_to": ["general", "respiratory", "shortness_of_breath"]
+    },
+    {
+      "id": "q_systolic_bp",
+      "question": "What is the patient's systolic blood pressure (mmHg)?",
+      "field": "systolic_bp",
+      "category": "vitals",
+      "type": "int",
+      "min": 40,
+      "max": 280,
+      "risk_impact": 3.0,
+      "uncertainty_reduction": 3.0,
+      "applicable_to": ["general", "cardiovascular", "dizziness", "chest_pain"]
+    },
+    {
+      "id": "q_temperature",
+      "question": "What is the patient's body temperature (degrees Celsius)?",
+      "field": "temperature",
+      "category": "vitals",
+      "type": "float",
+      "min": 30.0,
+      "max": 45.0,
+      "risk_impact": 2.0,
+      "uncertainty_reduction": 1.5,
+      "applicable_to": ["general", "fever", "infection", "sepsis"]
+    },
+    {
+      "id": "q_chest_pain",
+      "question": "Is the patient experiencing chest pain or pressure?",
+      "field": "chest_pain",
+      "category": "symptom",
+      "type": "bool",
+      "risk_impact": 2.5,
+      "uncertainty_reduction": 2.5,
+      "applicable_to": ["general", "cardiovascular", "chest_pain", "respiratory"]
+    },
+    {
+      "id": "q_pain_radiation",
+      "question": "Does the pain radiate to the arm, jaw, shoulder, or back?",
+      "field": "pain_radiation",
+      "category": "symptom",
+      "type": "bool",
+      "risk_impact": 2.0,
+      "uncertainty_reduction": 1.5,
+      "applicable_to": ["cardiovascular", "chest_pain"]
+    },
+    {
+      "id": "q_shortness_of_breath",
+      "question": "Is the patient experiencing shortness of breath or labored breathing?",
+      "field": "shortness_of_breath",
+      "category": "symptom",
+      "type": "bool",
+      "risk_impact": 2.5,
+      "uncertainty_reduction": 2.5,
+      "applicable_to": ["general", "respiratory", "cardiovascular", "shortness_of_breath"]
+    },
+    {
+      "id": "q_confusion",
+      "question": "Is the patient showing confusion, disorientation, or altered mental status?",
+      "field": "confusion",
+      "category": "symptom",
+      "type": "bool",
+      "risk_impact": 3.0,
+      "uncertainty_reduction": 2.5,
+      "applicable_to": ["general", "neurological", "sepsis", "cardiovascular"]
+    },
+    {
+      "id": "q_dizziness",
+      "question": "Is the patient experiencing lightheadedness or dizziness?",
+      "field": "dizziness",
+      "category": "symptom",
+      "type": "bool",
+      "risk_impact": 1.5,
+      "uncertainty_reduction": 1.0,
+      "applicable_to": ["general", "cardiovascular", "dizziness"]
+    },
+    {
+      "id": "q_age",
+      "question": "What is the patient's age in years?",
+      "field": "age",
+      "category": "demographics",
+      "type": "int",
+      "min": 0,
+      "max": 120,
+      "risk_impact": 1.5,
+      "uncertainty_reduction": 1.0,
+      "applicable_to": ["general"]
+    }
+  ]
+}

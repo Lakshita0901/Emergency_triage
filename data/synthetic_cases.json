@@ -1,0 +1,201 @@
+{
+  "cases": [
+    {
+      "id": "high_risk_chest_pain",
+      "title": "High-Risk: Acute Chest Pain (STEMI Presentation)",
+      "description": "68yo male presenting with crushing substernal chest pain radiating to the left arm, diaphoresis, and marked hypoxia. Classic high-risk profile with multiple critical-threshold vitals.",
+      "chief_complaint": "chest_pain",
+      "demographics": {
+        "age": 68
+      },
+      "expected_routing": "EMERGENCY",
+      "steps": [
+        {
+          "order": 1,
+          "field": "chest_pain",
+          "value": true,
+          "label": "Chest Pain: Present",
+          "clinical_note": "Patient reports severe crushing substernal pressure, onset 40 mins ago."
+        },
+        {
+          "order": 2,
+          "field": "pain_radiation",
+          "value": true,
+          "label": "Pain Radiation: Left arm and jaw",
+          "clinical_note": "Pain radiates to left arm and jaw — classic ACS radiation pattern."
+        },
+        {
+          "order": 3,
+          "field": "shortness_of_breath",
+          "value": true,
+          "label": "Shortness of Breath: Present",
+          "clinical_note": "Patient appears dyspneic at rest."
+        },
+        {
+          "order": 4,
+          "field": "oxygen_saturation",
+          "value": 90.0,
+          "label": "SpO2: 90% — Critical hypoxia",
+          "clinical_note": "SpO2 ≤91% → +3 risk points. Requires immediate oxygen support."
+        },
+        {
+          "order": 5,
+          "field": "heart_rate",
+          "value": 118,
+          "label": "HR: 118 bpm — Elevated tachycardia",
+          "clinical_note": "HR 111–130 → +2 risk points."
+        },
+        {
+          "order": 6,
+          "field": "respiratory_rate",
+          "value": 26,
+          "label": "RR: 26 breaths/min — Critical tachypnea",
+          "clinical_note": "RR ≥25 → +3 risk points."
+        },
+        {
+          "order": 7,
+          "field": "systolic_bp",
+          "value": 88,
+          "label": "Systolic BP: 88 mmHg — Hypotension",
+          "clinical_note": "SBP ≤90 → +3 risk points. Patient in cardiogenic shock."
+        }
+      ]
+    },
+    {
+      "id": "contradictory_breathing_case",
+      "title": "Contradictory Case: Escalation via Conflict",
+      "description": "55yo female with initially reported shortness of breath, later denying it — triggering a contradiction flag and ESCALATE_TO_HUMAN routing despite moderate vitals.",
+      "chief_complaint": "shortness_of_breath",
+      "demographics": {
+        "age": 55
+      },
+      "expected_routing": "ESCALATE_TO_HUMAN",
+      "steps": [
+        {
+          "order": 1,
+          "field": "shortness_of_breath",
+          "value": true,
+          "label": "Shortness of Breath: Initially reported Present",
+          "clinical_note": "Patient first states she is short of breath."
+        },
+        {
+          "order": 2,
+          "field": "oxygen_saturation",
+          "value": 91.0,
+          "label": "SpO2: 91% — Critical threshold",
+          "clinical_note": "SpO2 ≤91% → +3 risk points."
+        },
+        {
+          "order": 3,
+          "field": "heart_rate",
+          "value": 105,
+          "label": "HR: 105 bpm — Upper-normal",
+          "clinical_note": "Within 41–110 range, 0 additional points."
+        },
+        {
+          "order": 4,
+          "field": "respiratory_rate",
+          "value": 22,
+          "label": "RR: 22 breaths/min — Elevated but sub-critical",
+          "clinical_note": "RR below 25, 0 additional points."
+        },
+        {
+          "order": 5,
+          "field": "systolic_bp",
+          "value": 110,
+          "label": "Systolic BP: 110 mmHg — Normal",
+          "clinical_note": "SBP >90, 0 additional points."
+        },
+        {
+          "order": 6,
+          "field": "chest_pain",
+          "value": true,
+          "label": "Chest Pain: Present",
+          "clinical_note": "Patient confirms chest tightness → +2 risk points."
+        },
+        {
+          "order": 7,
+          "field": "shortness_of_breath",
+          "value": false,
+          "label": "⚡ CONTRADICTION: Shortness of Breath now denied",
+          "clinical_note": "Patient now denies breathlessness — contradicts step 1. Contradiction detected, escalation triggered."
+        }
+      ]
+    },
+    {
+      "id": "low_risk_muscle_pain",
+      "title": "Low-Risk: Musculoskeletal Chest Wall Pain",
+      "description": "28yo male with localized left-sided chest wall pain, reproducible on palpation. No cardiac risk factors, normal vitals throughout.",
+      "chief_complaint": "chest_pain",
+      "demographics": {
+        "age": 28
+      },
+      "expected_routing": "DISCHARGE",
+      "steps": [
+        {
+          "order": 1,
+          "field": "chest_pain",
+          "value": true,
+          "label": "Chest Pain: Present (musculoskeletal)",
+          "clinical_note": "Sharp, localized pain reproducible on palpation. +2 risk points."
+        },
+        {
+          "order": 2,
+          "field": "pain_radiation",
+          "value": false,
+          "label": "Pain Radiation: None",
+          "clinical_note": "No radiation. No additional points."
+        },
+        {
+          "order": 3,
+          "field": "shortness_of_breath",
+          "value": false,
+          "label": "Shortness of Breath: None",
+          "clinical_note": "Breathing comfortable at rest."
+        },
+        {
+          "order": 4,
+          "field": "oxygen_saturation",
+          "value": 99.0,
+          "label": "SpO2: 99% — Normal",
+          "clinical_note": "SpO2 >93%, 0 risk points."
+        },
+        {
+          "order": 5,
+          "field": "heart_rate",
+          "value": 76,
+          "label": "HR: 76 bpm — Normal",
+          "clinical_note": "HR 41–110, 0 risk points."
+        },
+        {
+          "order": 6,
+          "field": "respiratory_rate",
+          "value": 14,
+          "label": "RR: 14 breaths/min — Normal",
+          "clinical_note": "RR <25, 0 risk points."
+        },
+        {
+          "order": 7,
+          "field": "systolic_bp",
+          "value": 122,
+          "label": "Systolic BP: 122 mmHg — Normal",
+          "clinical_note": "SBP >90, 0 risk points."
+        },
+        {
+          "order": 8,
+          "field": "temperature",
+          "value": 36.8,
+          "label": "Temp: 36.8°C — Normal",
+          "clinical_note": "Temp within 35–39.0°C range, 0 risk points."
+        },
+        {
+          "order": 9,
+          "field": "confusion",
+          "value": false,
+          "label": "Confusion: Absent",
+          "clinical_note": "Alert and oriented x4. No neurological concerns."
+        }
+      ]
+    }
+  ]
+}

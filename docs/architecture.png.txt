@@ -1,0 +1,3 @@
+﻿<!-- Placeholder note: architecture diagram will be saved as architecture.png -->
+# System Architecture
+Diagram will illustrate LangGraph workflow, deterministic rules engine, and Streamlit UI.

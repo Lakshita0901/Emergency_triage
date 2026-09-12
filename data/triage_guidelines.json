@@ -1,0 +1,75 @@
+{
+  "guidelines": {
+    "routing_outcomes": [
+      "DISCHARGE",
+      "PRIMARY_CARE",
+      "EMERGENCY",
+      "ESCALATE_TO_HUMAN"
+    ],
+    "risk_score_signals": {
+      "oxygen_saturation": [
+        {"max": 91.0, "points": 3, "label": "Severe hypoxia (<=91%)"},
+        {"min": 92.0, "max": 93.0, "points": 2, "label": "Elevated hypoxia (92-93%)"}
+      ],
+      "heart_rate": [
+        {"threshold": "<=40 or >=131", "points": 3, "label": "Severe bradycardia/tachycardia"},
+        {"min": 111, "max": 130, "points": 2, "label": "Elevated tachycardia (111-130)"}
+      ],
+      "respiratory_rate": [
+        {"min": 25, "points": 3, "label": "Severe tachypnea (>=25)"}
+      ],
+      "systolic_bp": [
+        {"max": 90, "points": 3, "label": "Severe hypotension (<=90 mmHg)"}
+      ],
+      "temperature": [
+        {"threshold": "<=35.0 or >=39.1", "points": 3, "label": "Hypothermia/Hyperthermia"}
+      ],
+      "symptoms": {
+        "chest_pain": 2,
+        "pain_radiation": 2,
+        "shortness_of_breath": 2,
+        "confusion": 3
+      },
+      "age": [
+        {"min": 70, "points": 2, "label": "Age >= 70"},
+        {"min": 55, "max": 69, "points": 1, "label": "Age 55-69"}
+      ]
+    },
+    "thresholds": {
+      "low": {"max": 3, "label": "LOW (<4)"},
+      "moderate": {"min": 4, "max": 6, "label": "MODERATE (4-6)"},
+      "high": {"min": 7, "label": "HIGH (>=7)"}
+    },
+    "routing_rules": [
+      {
+        "decision": "ESCALATE_TO_HUMAN",
+        "condition": "risk >= 7 AND (uncertainty >= 0.50 OR contradictions exist OR critical fields missing)"
+      },
+      {
+        "decision": "EMERGENCY",
+        "condition": "risk >= 7 AND uncertainty < 0.50 AND no contradictions AND no critical fields missing"
+      },
+      {
+        "decision": "PRIMARY_CARE",
+        "condition": "4 <= risk <= 6"
+      },
+      {
+        "decision": "DISCHARGE",
+        "condition": "risk < 4 AND uncertainty <= 0.25"
+      },
+      {
+        "decision": null,
+        "condition": "risk < 4 AND uncertainty > 0.25 (ask more questions)"
+      }
+    ],
+    "critical_fields": [
+      "oxygen_saturation",
+      "heart_rate",
+      "respiratory_rate",
+      "systolic_bp",
+      "chest_pain",
+      "shortness_of_breath"
+    ],
+    "uncertainty_formula": "uncertainty = (missing_critical / total_critical) + min(0.15 * num_contradictions, 0.30), capped at 1.0"
+  }
+}
