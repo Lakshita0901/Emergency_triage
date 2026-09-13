@@ -19,6 +19,7 @@ from tools.risk_scorer import (
     score_symptoms,
     score_age,
     calculate_risk,
+    validate_vital,
 )
 
 
@@ -385,3 +386,134 @@ def test_calculate_risk_all_synthetic_cases_parameterized(
 
     result = calculate_risk(state)
     assert result["level"] == expected_risk_level
+
+
+# ---------------------------------------------------------------------------
+# 10. validate_vital & Invalid Tool Input Failure Recovery
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "field, val, should_pass",
+    [
+        # Physiologically plausible
+        ("oxygen_saturation", 98.0, True),
+        ("oxygen_saturation", 0.0, True),
+        ("oxygen_saturation", 100.0, True),
+        ("heart_rate", 72, True),
+        ("heart_rate", 0, True),
+        ("heart_rate", 300, True),
+        ("respiratory_rate", 16, True),
+        ("respiratory_rate", 0, True),
+        ("respiratory_rate", 80, True),
+        ("systolic_bp", 120, True),
+        ("systolic_bp", 0, True),
+        ("systolic_bp", 300, True),
+        ("temperature", 37.0, True),
+        ("temperature", 25.0, True),
+        ("temperature", 45.0, True),
+        ("age", 45, True),
+
+        # Physiologically implausible / out of range
+        ("oxygen_saturation", 150, False),
+        ("oxygen_saturation", -5, False),
+        ("heart_rate", -5, False),
+        ("heart_rate", 500, False),
+        ("respiratory_rate", -2, False),
+        ("respiratory_rate", 120, False),
+        ("systolic_bp", -10, False),
+        ("systolic_bp", 450, False),
+        ("temperature", 20.0, False),
+        ("temperature", 50.0, False),
+        ("age", -1, False),
+        ("age", 250, False),
+
+        # Wrong type / None
+        ("temperature", "abc", False),
+        ("oxygen_saturation", None, False),
+        ("heart_rate", None, False),
+        ("systolic_bp", True, False),
+    ],
+)
+def test_validate_vital_ranges_and_types(field, val, should_pass):
+    is_valid, reason = validate_vital(field, val)
+    assert is_valid is should_pass
+    if not should_pass:
+        assert isinstance(reason, str)
+        assert len(reason) > 0
+
+
+def test_calculate_risk_handles_invalid_inputs_without_exception():
+    """Assert calculate_risk() handles SpO2=150, heart_rate=-5, and temperature='abc'
+    without raising an exception, excludes them from scoring, and returns invalid_fields.
+    """
+    state = {
+        "oxygen_saturation": 150,
+        "heart_rate": -5,
+        "temperature": "abc",
+    }
+    # Must not raise an exception
+    result = calculate_risk(state)
+
+    assert isinstance(result, dict)
+    assert "invalid_fields" in result
+    assert "oxygen_saturation" in result["invalid_fields"]
+    assert "heart_rate" in result["invalid_fields"]
+    assert "temperature" in result["invalid_fields"]
+    # Bad values are excluded from scoring, so total score is 0
+    assert result["score"] == 0
+    assert result["level"] == "LOW"
+    assert result["risk_factors"] == []
+
+
+def test_failure_recovery_run_one_cycle_rejects_invalid_vital():
+    """End-to-end failure recovery check: invalid input is rejected, logged in audit,
+    does NOT corrupt patient state, re-selects the same question, and sets UI warning.
+    """
+    from agent.graph import run_one_cycle
+
+    initial_state = {
+        "age": 45,
+        "chief_complaint": "general",
+        "vitals": {},
+        "symptoms": {},
+        "oxygen_saturation": None,
+        "heart_rate": None,
+        "respiratory_rate": None,
+        "systolic_bp": None,
+        "temperature": None,
+        "turn_count": 0,
+        "audit_log": [],
+        "current_question": {
+            "id": "q_spo2",
+            "field": "oxygen_saturation",
+            "question": "What is the patient's oxygen saturation?",
+        },
+    }
+
+    # Submit out-of-range SpO2 = 150
+    updated = run_one_cycle(initial_state, new_answer={"field": "oxygen_saturation", "value": 150})
+
+    # 1. Field is NOT updated in patient state
+    assert updated.get("oxygen_saturation") is None
+    assert "oxygen_saturation" not in updated.get("vitals", {})
+
+    # 2. Audit event 'invalid_input_rejected' is recorded
+    audit_events = updated.get("audit_log", [])
+    rejected_events = [e for e in audit_events if e.get("event_type") == "invalid_input_rejected"]
+    assert len(rejected_events) == 1
+    ev = rejected_events[0]
+    payload = ev.get("payload", ev)
+    assert payload.get("field") == "oxygen_saturation"
+    assert payload.get("attempted_value") == 150
+
+    # 3. Warning message is set
+    assert updated.get("last_validation_error") == "That value is outside a plausible range for oxygen_saturation — please re-enter."
+
+    # 4. Turn count did not advance
+    assert updated.get("turn_count") == 0
+
+    # 5. Question was re-selected (target field is still oxygen_saturation)
+    curr_q = updated.get("current_question")
+    assert curr_q is not None
+    assert curr_q.get("field") == "oxygen_saturation"
+

@@ -47,6 +47,8 @@ class PatientState(TypedDict, total=False):
     risk_score: int
     risk_level: str
     risk_factors: List[str]
+    invalid_fields: Optional[List[str]]
+    last_validation_error: Optional[str]
     uncertainty: float
     contradictions: List[str]
     contradiction_details: List[Dict[str, Any]]

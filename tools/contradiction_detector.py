@@ -78,10 +78,15 @@ def append_audit_event(
         state["audit_log"] = []
 
     timestamp = datetime.now(timezone.utc).isoformat()
-    event: AuditEvent = {
+    event: Dict[str, Any] = {
         "event_type": event_type,
         "timestamp": timestamp,
         "payload": payload,
     }
+    if isinstance(payload, dict):
+        for k, v in payload.items():
+            if k not in event:
+                event[k] = v
+
     state["audit_log"].append(event)
     return state

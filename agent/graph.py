@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from langgraph.graph import StateGraph, START, END
 
 from agent.state import PatientState, RoutingDecision
-from tools.risk_scorer import calculate_risk
+from tools.risk_scorer import calculate_risk, validate_vital
 from tools.contradiction_detector import detect_contradiction, append_audit_event
 from agent.decision_engine import calculate_uncertainty, decide_routing
 from agent.question_selector import select_next_question
@@ -34,6 +34,7 @@ def assess_node(state: PatientState) -> Dict[str, Any]:
     risk_score = risk_result["score"]
     risk_level = risk_result["level"]
     risk_factors = risk_result["risk_factors"]
+    invalid_fields = risk_result.get("invalid_fields", [])
 
     # Calculate deterministic uncertainty and missing critical fields
     unc_result = calculate_uncertainty(state)
@@ -45,6 +46,7 @@ def assess_node(state: PatientState) -> Dict[str, Any]:
         "risk_score": risk_score,
         "risk_level": risk_level,
         "risk_factors": risk_factors,
+        "invalid_fields": invalid_fields,
         "uncertainty": uncertainty,
         "missing_critical_fields": missing_fields,
     }
@@ -58,6 +60,7 @@ def assess_node(state: PatientState) -> Dict[str, Any]:
         "risk_score": risk_score,
         "risk_level": risk_level,
         "risk_factors": risk_factors,
+        "invalid_fields": invalid_fields,
         "uncertainty": uncertainty,
         "missing_critical_fields": missing_fields,
         "routing_decision": routing_decision,
@@ -106,6 +109,27 @@ def receive_answer_node(state: PatientState) -> Dict[str, Any]:
 def update_state_node(state: PatientState) -> Dict[str, Any]:
     """Apply answer to patient state and update turn count."""
     new_ans = state.get("new_answer")
+    if new_ans and isinstance(new_ans, dict):
+        field = new_ans.get("field")
+        value = new_ans.get("value")
+        if field and field in (
+            "oxygen_saturation",
+            "heart_rate",
+            "respiratory_rate",
+            "systolic_bp",
+            "temperature",
+            "age",
+            "spo2",
+            "hr",
+            "rr",
+            "sbp",
+            "temp",
+        ):
+            is_valid, _ = validate_vital(field, value)
+            if not is_valid:
+                # Do NOT update invalid field
+                return {}
+
     updates: Dict[str, Any] = {
         "turn_count": state.get("turn_count", 0) + 1,
     }
@@ -237,6 +261,9 @@ def run_one_cycle(
 
     Steps performed:
     1. If `new_answer` provided:
+       - Validate physiological plausibility of vital-sign fields.
+       - If invalid, log audit event, keep prior state unchanged, set UI warning,
+         re-select the same question via select_next_question, and return.
        - Check for contradiction against current state.
        - Update patient state with the new value.
        - Re-run contradiction detection and audit log.
@@ -265,10 +292,51 @@ def run_one_cycle(
     if new_answer and isinstance(new_answer, dict):
         updated_state["new_answer"] = new_answer
         
-        # Detect contradiction before overwriting
         field = new_answer.get("field")
         value = new_answer.get("value")
         if field:
+            # Check physiological plausibility for vital signs & age
+            if field in (
+                "oxygen_saturation",
+                "heart_rate",
+                "respiratory_rate",
+                "systolic_bp",
+                "temperature",
+                "age",
+                "spo2",
+                "hr",
+                "rr",
+                "sbp",
+                "temp",
+            ):
+                is_valid, reason = validate_vital(field, value)
+                if not is_valid:
+                    # Log audit event
+                    append_audit_event(
+                        updated_state,
+                        "invalid_input_rejected",
+                        {"field": field, "attempted_value": value, "reason": reason},
+                    )
+                    # Do NOT update that field in patient state
+                    # Set warning message in state
+                    warning_msg = f"That value is outside a plausible range for {field} — please re-enter."
+                    updated_state["last_validation_error"] = warning_msg
+
+                    # Re-select the SAME question (via select_next_question) instead of advancing
+                    qb = question_bank or updated_state.get("question_bank") or []
+                    next_q = select_next_question(updated_state, qb)
+                    if next_q:
+                        updated_state["current_question"] = next_q
+
+                    # Re-assess without advancing turn_count
+                    assess_res = assess_node(updated_state)
+                    updated_state.update(assess_res)
+                    return updated_state
+
+            # Valid answer: clear last validation error
+            updated_state["last_validation_error"] = None
+
+            # Detect contradiction before overwriting
             contra = detect_contradiction(updated_state, field, value)
             if contra:
                 contra_msg = f"Contradiction on {field}: previously {contra['old_value']}, now {contra['new_value']}"

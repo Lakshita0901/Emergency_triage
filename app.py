@@ -10,6 +10,7 @@ import streamlit as st
 
 from agent.graph import run_one_cycle
 from agent.state import PatientState
+from tools.patient_data_tool import classify_value, lookup_reference_ranges
 
 # ---------------------------------------------------------------------------
 # Page Configuration & Styling
@@ -171,6 +172,8 @@ def create_initial_patient_state(age: Optional[int] = None, chief_complaint: str
             "chest_pain",
             "shortness_of_breath",
         ],
+        "invalid_fields": [],
+        "last_validation_error": None,
         "routing_decision": None,
         "routing_reason": None,
         "rationale": None,
@@ -201,7 +204,7 @@ synthetic_cases = load_synthetic_cases()
 # ---------------------------------------------------------------------------
 st.markdown("### 🏥 **TriageFlow AI** `Simulated Emergency Triage (Prototype - NOT Clinical)`")
 
-col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns([1.2, 1.1, 1.4, 1.4, 1.5, 1.0])
+col_b1, col_b2, col_b3, col_b4, col_b5, col_b_inv, col_b6 = st.columns([1.1, 1.0, 1.2, 1.3, 1.2, 1.6, 0.9])
 
 with col_b1:
     if st.button("➕ Initialize Patient", use_container_width=True):
@@ -240,6 +243,27 @@ with col_b4:
 with col_b5:
     if st.button("🟢 Low-Risk Demo", use_container_width=True):
         _load_demo("low_risk_muscle_pain", "chest_pain")
+
+with col_b_inv:
+    if st.button("⚠️ Simulate Invalid Input", use_container_width=True):
+        curr_q = st.session_state.patient_state.get("current_question")
+        target_field = curr_q.get("field") if curr_q else "oxygen_saturation"
+        invalid_val_map = {
+            "oxygen_saturation": 150.0,
+            "heart_rate": 500,
+            "respiratory_rate": 150,
+            "systolic_bp": 450,
+            "temperature": 60.0,
+            "age": 250,
+        }
+        bad_value = invalid_val_map.get(target_field, 150.0)
+        qb = load_question_bank()
+        st.session_state.patient_state = run_one_cycle(
+            st.session_state.patient_state,
+            new_answer={"field": target_field, "value": bad_value},
+            question_bank=qb,
+        )
+        st.rerun()
 
 with col_b6:
     if st.button("🔄 Reset", use_container_width=True):
@@ -311,18 +335,35 @@ with left_col:
     # Known Vitals
     st.markdown("##### 🫀 Known Vitals")
     vitals_data = [
-        ("Oxygen Saturation (SpO2)", state.get("oxygen_saturation"), "%"),
-        ("Heart Rate (HR)", state.get("heart_rate"), "bpm"),
-        ("Respiratory Rate (RR)", state.get("respiratory_rate"), "/min"),
-        ("Systolic BP", state.get("systolic_bp"), "mmHg"),
-        ("Temperature", state.get("temperature"), "°C"),
+        ("oxygen_saturation", "Oxygen Saturation (SpO2)", state.get("oxygen_saturation"), "%"),
+        ("heart_rate", "Heart Rate (HR)", state.get("heart_rate"), "bpm"),
+        ("respiratory_rate", "Respiratory Rate (RR)", state.get("respiratory_rate"), "/min"),
+        ("systolic_bp", "Systolic BP", state.get("systolic_bp"), "mmHg"),
+        ("temperature", "Temperature", state.get("temperature"), "°C"),
     ]
     vitals_table = []
-    for label, val, unit in vitals_data:
+    for field_key, label, val, unit in vitals_data:
+        classification = classify_value(field_key, val)
+        ref_ranges = lookup_reference_ranges(field_key)
+        norm_range = ref_ranges.get("normal_range")
+        ref_text = f"{norm_range[0]}–{norm_range[1]} {unit}" if norm_range else ""
+
+        if val is None or classification == "unknown":
+            status_label = "⚪ Missing"
+        elif classification == "normal":
+            status_label = "🟢 Normal"
+        elif classification == "abnormal":
+            status_label = "🟡 Abnormal"
+        elif classification == "critical":
+            status_label = "🔴 Critical"
+        else:
+            status_label = f"⚪ {classification.title()}"
+
         vitals_table.append({
             "Vital": label,
             "Value": f"{val} {unit}" if val is not None else "— Missing —",
-            "Status": "Recorded" if val is not None else "Missing"
+            "Status": status_label,
+            "Ref Range": ref_text,
         })
     st.dataframe(vitals_table, hide_index=True, use_container_width=True)
 
@@ -368,6 +409,10 @@ with left_col:
 # ---------------------------------------------------------------------------
 with center_col:
     st.markdown("#### 💬 Active Inquiry & Input")
+
+    val_error = state.get("last_validation_error")
+    if val_error:
+        st.warning(val_error)
 
     current_q = state.get("current_question")
     is_complete = state.get("is_complete", False)

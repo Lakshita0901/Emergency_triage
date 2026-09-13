@@ -15,10 +15,81 @@ CRITICAL_FIELDS: list[str] = [
 ]
 
 
-class RiskResult(TypedDict):
+class RiskResult(TypedDict, total=False):
     score: int
     level: str  # "LOW" | "MODERATE" | "HIGH"
     risk_factors: list[str]
+    invalid_fields: list[str]
+
+
+PHYSIOLOGICAL_RANGES: dict[str, tuple[float, float, str]] = {
+    "oxygen_saturation": (0.0, 100.0, "0–100%"),
+    "heart_rate": (0.0, 300.0, "0–300 bpm"),
+    "respiratory_rate": (0.0, 80.0, "0–80 breaths/min"),
+    "systolic_bp": (0.0, 300.0, "0–300 mmHg"),
+    "temperature": (25.0, 45.0, "25–45°C"),
+    "age": (0.0, 130.0, "0–130 years"),
+}
+
+FIELD_ALIASES: dict[str, str] = {
+    "oxygen_saturation": "oxygen_saturation",
+    "spo2": "oxygen_saturation",
+    "o2_sat": "oxygen_saturation",
+    "heart_rate": "heart_rate",
+    "hr": "heart_rate",
+    "pulse": "heart_rate",
+    "respiratory_rate": "respiratory_rate",
+    "rr": "respiratory_rate",
+    "resp_rate": "respiratory_rate",
+    "systolic_bp": "systolic_bp",
+    "sbp": "systolic_bp",
+    "blood_pressure": "systolic_bp",
+    "bp": "systolic_bp",
+    "temperature": "temperature",
+    "temp": "temperature",
+    "age": "age",
+}
+
+
+def validate_vital(field: str, value: Any) -> tuple[bool, str]:
+    """Validate whether a value is physiologically plausible for a given vital sign.
+
+    Parameters:
+        field: Name of the vital sign or demographic field (e.g. oxygen_saturation,
+               heart_rate, respiratory_rate, systolic_bp, temperature).
+        value: Numeric measurement value.
+
+    Returns:
+        (True, "") if the value is physiologically plausible for that field.
+        (False, reason) otherwise.
+    """
+    if not isinstance(field, str):
+        return False, "Field name must be a string."
+
+    norm_field = FIELD_ALIASES.get(field.strip().lower(), field.strip().lower())
+
+    if value is None:
+        return False, f"Value for {field} cannot be None."
+
+    if isinstance(value, bool):
+        return False, f"Value for {field} must be numeric, not a boolean."
+
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return False, f"Value for {field} must be a valid number, got {value!r}."
+
+    if norm_field not in PHYSIOLOGICAL_RANGES:
+        return False, f"Unrecognized vital sign field: {field}."
+
+    min_val, max_val, unit_str = PHYSIOLOGICAL_RANGES[norm_field]
+    if not (min_val <= val <= max_val):
+        return (
+            False,
+            f"{field} value {value} is outside plausible physiological range ({unit_str}).",
+        )
+
+    return True, ""
 
 
 def score_oxygen_saturation(spo2: float | None) -> tuple[int, str | None]:
@@ -108,14 +179,29 @@ def score_age(age: int | None) -> tuple[int, str | None]:
 def calculate_risk(state: dict[str, Any]) -> RiskResult:
     """Aggregate all scoring functions into a total risk score and level.
 
+    Validates physiological plausibility of all vital signs before scoring.
+    If a field fails validation, it is excluded from scoring and added to 'invalid_fields'.
+
     Returns:
         RiskResult with keys:
             score: int — total risk points
             level: "LOW" (score<4) | "MODERATE" (4–6) | "HIGH" (≥7)
             risk_factors: list of human-readable factor strings
+            invalid_fields: list of field names that failed physiological validation
     """
     risk_factors: list[str] = []
+    invalid_fields: list[str] = []
     total = 0
+
+    # Validate each vital/demographic field present in state
+    validated_state = dict(state)
+    for field in ("oxygen_saturation", "heart_rate", "respiratory_rate", "systolic_bp", "temperature", "age"):
+        val = state.get(field)
+        if val is not None:
+            is_valid, _reason = validate_vital(field, val)
+            if not is_valid:
+                invalid_fields.append(field)
+                validated_state[field] = None  # Exclude from scoring
 
     def _add(points: int, factor: str | None) -> None:
         nonlocal total
@@ -123,25 +209,25 @@ def calculate_risk(state: dict[str, Any]) -> RiskResult:
             total += points
             risk_factors.append(factor)
 
-    p, f = score_oxygen_saturation(state.get("oxygen_saturation"))
+    p, f = score_oxygen_saturation(validated_state.get("oxygen_saturation"))
     _add(p, f)
 
-    p, f = score_heart_rate(state.get("heart_rate"))
+    p, f = score_heart_rate(validated_state.get("heart_rate"))
     _add(p, f)
 
-    p, f = score_respiratory_rate(state.get("respiratory_rate"))
+    p, f = score_respiratory_rate(validated_state.get("respiratory_rate"))
     _add(p, f)
 
-    p, f = score_systolic_bp(state.get("systolic_bp"))
+    p, f = score_systolic_bp(validated_state.get("systolic_bp"))
     _add(p, f)
 
-    p, f = score_temperature(state.get("temperature"))
+    p, f = score_temperature(validated_state.get("temperature"))
     _add(p, f)
 
-    p, f = score_age(state.get("age"))
+    p, f = score_age(validated_state.get("age"))
     _add(p, f)
 
-    sym_points, sym_factors = score_symptoms(state)
+    sym_points, sym_factors = score_symptoms(validated_state)
     total += sym_points
     risk_factors.extend(sym_factors)
 
@@ -152,4 +238,9 @@ def calculate_risk(state: dict[str, Any]) -> RiskResult:
     else:
         level = "LOW"
 
-    return RiskResult(score=total, level=level, risk_factors=risk_factors)
+    return RiskResult(
+        score=total,
+        level=level,
+        risk_factors=risk_factors,
+        invalid_fields=invalid_fields,
+    )
